@@ -1,16 +1,16 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.impute import SimpleImputer
-from imblearn.over_sampling import SMOTE
 import pickle
-import os
+from visualize import (
+    plot_churn_distribution,
+    plot_numerical_distribution,
+    plot_categorical_distribution,
+    plot_correlation_heatmap,
+    plot_feature_importance,
+    plot_confusion_matrix,
+    load_model
+)
+from train import load_data
 
 # Set page config
 st.set_page_config(
@@ -19,237 +19,101 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load data function with caching
+# Load data and model
 @st.cache_data
-def load_data():
-    data = pd.read_csv('data/WA_Fn-UseC_-Telco-Customer-Churn.csv')
-    # Data cleaning
-    data['TotalCharges'] = pd.to_numeric(data['TotalCharges'], errors='coerce')
-    data['TotalCharges'].fillna(data['TotalCharges'].median(), inplace=True)
-    return data
+def get_data():
+    return load_data()
 
-# Train model function with caching
 @st.cache_resource
-def train_model(data):
-    # Preprocessing
-    data = data.copy()
-    data['Churn'] = data['Churn'].map({'Yes': 1, 'No': 0})
-    
-    categorical_cols = [col for col in data.columns if data[col].dtype == 'object' and col != 'customerID']
-    numerical_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
-    
-    # Encode categorical variables
-    label_encoders = {}
-    for col in categorical_cols:
-        le = LabelEncoder()
-        data[col] = le.fit_transform(data[col])
-        label_encoders[col] = le
-    
-    # Scale numerical features
-    scaler = StandardScaler()
-    data[numerical_cols] = scaler.fit_transform(data[numerical_cols])
-    
-    # Split data
-    X = data.drop(['Churn', 'customerID'], axis=1)
-    y = data['Churn']
-    
-    # Handle class imbalance
-    smote = SMOTE(random_state=42)
-    X_res, y_res = smote.fit_resample(X, y)
-    
-    # Train model
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_res, y_res)
-    
-    return model, label_encoders, scaler
-
-# Save model function
-def save_model(model, encoders, scaler):
-    with open('model.pkl', 'wb') as f:
-        pickle.dump({
-            'model': model,
-            'encoders': encoders,
-            'scaler': scaler
-        }, f)
-
-# Load model function
-def load_model():
-    if os.path.exists('model.pkl'):
-        with open('model.pkl', 'rb') as f:
-            return pickle.load(f)
-    return None
+def get_model():
+    return load_model()
 
 # Sidebar navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Data Analysis", "Churn Prediction"])
+st.sidebar.title("App Sections")
+st.sidebar.image("images/dashboard.png", width=200)
+page = st.sidebar.radio("Go to", ["About App", "Churn Prediction", "Data Analysis & Model Performance"], index=0)
 
-# Home Page
-if page == "Home":
-    st.title("Customer Analytics Dashboard")
-    st.image("https://cdn-icons-png.flaticon.com/512/2093/2093638.png", width=200)
+# About App Page
+if page == "About App":
+    st.title("Credit Card Fraud Detection App")
+    st.image("images/card.png", use_container_width=True)
     
     st.markdown("""
-    ## Welcome to the Customer Analytics Dashboard
-    
-    This application helps you:
-    - Analyze customer data patterns
-    - Predict customer churn
-    - Understand key factors affecting customer retention
-    
-    Use the navigation panel on the left to explore different sections.
+    ## Purpose of the App
+    The **Customer Analytics Dashboard** is designed to help businesses understand their customers better and take proactive measures to improve customer retention. This app leverages machine learning to predict customer churn and provides insights into key factors influencing customer behavior.
+
+    ## Key Features
+    - **Data Analysis**: Visualize customer data patterns, including churn distribution, numerical feature trends, and categorical feature distributions.
+    - **Model Performance**: Evaluate the machine learning model's performance using metrics like feature importance and confusion matrix.
+    - **Churn Prediction**: Predict whether a customer is likely to churn based on their details.
+
+    ## How to Use
+    1. **Navigate**: Use the sidebar to switch between different sections:
+        - **About App**: Learn about the app's purpose and features.
+        - **Churn Prediction**: Predict churn for a new customer by filling out a form.
+        - **Data Analysis & Model Performance**: Explore the dataset and evaluate the model's performance.
+    2. **Analyze Data**: Go to the "Data Analysis & Model Performance" section to explore customer data and understand key trends.
+    3. **Predict Churn**: Use the "Churn Prediction" section to input customer details and get a prediction on whether they are likely to churn.
+
+    ## Benefits
+    - **Proactive Retention**: Identify customers at risk of churning and take timely actions to retain them.
+    - **Data-Driven Decisions**: Make informed decisions based on customer data insights.
+    - **Improved Customer Experience**: Understand customer needs and preferences to enhance their experience.
+
+    ## Contact
+    For any queries or feedback, feel free to reach out:
+    - 📧 **Email 1**: [g24ait2204@iitj.ac.in](mailto:g24ait2204@iitj.ac.in)
+    - 📧 **Email 2**: [g24ait2008@iitj.ac.in](mailto:g24ait2008@iitj.ac.in)
     """)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Data Analysis")
-        st.markdown("""
-        - Explore the dataset
-        - View visualizations
-        - Understand data distributions
-        """)
-    
-    with col2:
-        st.subheader("Churn Prediction")
-        st.markdown("""
-        - Predict customer churn
-        - View model performance
-        - Understand feature importance
-        """)
 
 # Data Analysis Page
-elif page == "Data Analysis":
+elif page == "Data Analysis & Model Performance":
     st.title("Data Analysis")
-    data = load_data()
+    data = get_data()
     
     st.subheader("Dataset Overview")
     st.write(f"Dataset shape: {data.shape}")
-    st.dataframe(data.head())
-    
-    st.subheader("Data Description")
-    st.write(data.describe())
     
     # Visualizations
     st.subheader("Data Visualizations")
     
     # Churn distribution
     st.write("### Churn Distribution")
-    fig, ax = plt.subplots()
-    sns.countplot(x='Churn', data=data, ax=ax)
-    st.pyplot(fig)
+    st.pyplot(plot_churn_distribution(data))
     
     # Numerical features distribution
     st.write("### Numerical Features Distribution")
     num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
     selected_num = st.selectbox("Select numerical feature", num_cols)
-    fig, ax = plt.subplots()
-    sns.histplot(data[selected_num], kde=True, ax=ax)
-    st.pyplot(fig)
+    st.pyplot(plot_numerical_distribution(data, selected_num))
     
     # Categorical features distribution
     st.write("### Categorical Features Distribution")
     cat_cols = [col for col in data.columns if data[col].dtype == 'object' and col != 'customerID']
     selected_cat = st.selectbox("Select categorical feature", cat_cols)
-    fig, ax = plt.subplots(figsize=(10, 4))
-    sns.countplot(x=selected_cat, hue='Churn', data=data, ax=ax)
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    st.pyplot(plot_categorical_distribution(data, selected_cat))
     
     # Correlation heatmap
     st.write("### Correlation Heatmap")
-    numeric_data = data[['tenure', 'MonthlyCharges', 'TotalCharges', 'SeniorCitizen']]
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(numeric_data.corr(), annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
-    
-    # Model training section
-    st.subheader("Model Training Information")
-    st.markdown("""
-    ### How We Train the Model
-    
-    1. **Data Preprocessing**:
-       - Handle missing values
-       - Encode categorical variables
-       - Scale numerical features
-    
-    2. **Handling Class Imbalance**:
-       - Use SMOTE (Synthetic Minority Over-sampling Technique)
-    
-    3. **Model Selection**:
-       - Random Forest Classifier
-       - 100 estimators
-       - Default hyperparameters
-    
-    4. **Evaluation Metrics**:
-       - Accuracy
-       - Precision
-       - Recall
-       - F1-score
-    """)
+    st.pyplot(plot_correlation_heatmap(data))
 
-# Churn Prediction Page
-elif page == "Churn Prediction":
     st.title("Customer Churn Prediction")
-    data = load_data()
-    
-    # Load or train model
-    model_data = load_model()
-    if model_data:
-        model = model_data['model']
-        label_encoders = model_data['encoders']
-        scaler = model_data['scaler']
-        st.success("Using pre-trained model")
-    else:
-        with st.spinner("Training model... This may take a few minutes"):
-            model, label_encoders, scaler = train_model(data)
-            save_model(model, label_encoders, scaler)
-        st.success("Model trained successfully!")
+    data = get_data()
+    model_data = get_model()
     
     # Model evaluation
     st.subheader("Model Performance")
     
-    # Prepare data for evaluation
-    data_copy = data.copy()
-    data_copy['Churn'] = data_copy['Churn'].map({'Yes': 1, 'No': 0})
-    
-    categorical_cols = [col for col in data_copy.columns if data_copy[col].dtype == 'object' and col != 'customerID']
-    numerical_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
-    
-    # Encode and scale
-    for col in categorical_cols:
-        data_copy[col] = label_encoders[col].transform(data_copy[col])
-    
-    data_copy[numerical_cols] = scaler.transform(data_copy[numerical_cols])
-    
-    X = data_copy.drop(['Churn', 'customerID'], axis=1)
-    y = data_copy['Churn']
-    
-    # Predictions
-    y_pred = model.predict(X)
-    
-    # Metrics
-    st.write("### Classification Report")
-    st.text(classification_report(y, y_pred))
+    st.write("### Feature Importance")
+    st.pyplot(plot_feature_importance(model_data))
     
     st.write("### Confusion Matrix")
-    cm = confusion_matrix(y, y_pred)
-    fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('Actual')
-    st.pyplot(fig)
-    
-    # Feature importance
-    st.write("### Feature Importance")
-    feature_importance = pd.DataFrame({
-        'Feature': X.columns,
-        'Importance': model.feature_importances_
-    }).sort_values('Importance', ascending=False)
-    
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.barplot(x='Importance', y='Feature', data=feature_importance.head(10), ax=ax)
-    st.pyplot(fig)
-    
+    st.pyplot(plot_confusion_matrix(model_data, data))
+
+# Churn Prediction Page
+elif page == "Churn Prediction":
+    data = get_data()
+    model_data = get_model()  
     # Prediction form
     st.subheader("Predict Churn for New Customer")
     with st.form("prediction_form"):
@@ -259,7 +123,8 @@ elif page == "Churn Prediction":
         
         with col1:
             gender = st.selectbox("Gender", ["Male", "Female"])
-            senior_citizen = st.selectbox("Senior Citizen", [0, 1])
+            senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
+            senior_citizen = 1 if senior_citizen == "Yes" else 0
             partner = st.selectbox("Partner", ["No", "Yes"])
             dependents = st.selectbox("Dependents", ["No", "Yes"])
             tenure = st.number_input("Tenure (months)", min_value=0, max_value=100, value=12)
@@ -318,15 +183,16 @@ elif page == "Churn Prediction":
             input_df = pd.DataFrame([input_data])
             
             # Encode categorical variables
-            for col in categorical_cols:
-                input_df[col] = label_encoders[col].transform(input_df[col])
+            for col in [k for k in input_data.keys() if k in model_data['encoders']]:
+                input_df[col] = model_data['encoders'][col].transform(input_df[col])
             
             # Scale numerical features
-            input_df[numerical_cols] = scaler.transform(input_df[numerical_cols])
+            numerical_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+            input_df[numerical_cols] = model_data['scaler'].transform(input_df[numerical_cols])
             
             # Make prediction
-            prediction = model.predict(input_df.drop(['customerID'], axis=1, errors='ignore'))
-            probability = model.predict_proba(input_df.drop(['customerID'], axis=1, errors='ignore'))
+            prediction = model_data['model'].predict(input_df)
+            probability = model_data['model'].predict_proba(input_df)
             
             # Display results
             st.subheader("Prediction Result")
@@ -336,3 +202,47 @@ elif page == "Churn Prediction":
             else:
                 st.success(f"Prediction: No Churn (Probability: {probability[0][0]:.2%})")
                 st.write("This customer is likely to stay.")
+
+
+# Footer Section
+st.markdown(
+    """
+    <style>
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #f9f9f9;
+            text-align: center;
+            height: 40px; /* Adjusted height for a thinner footer */
+            line-height: 40px; /* Align text vertically */
+            border-top: 1px solid #eaeaea;
+            font-size: 14px; /* Smaller font size */
+        }
+        .footer a {
+            color: #0073b1; /* LinkedIn blue color */
+            text-decoration: none;
+            margin-left: 5px;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <div class="footer">
+        <p>
+            Connect with us on 
+            <a href="https://www.linkedin.com/in/vikash-malakar-25aa90116/" target="_blank">
+                <i class="fab fa-linkedin"></i> Vikash Malakar
+            </a> 
+            and 
+            <a href="https://www.linkedin.com/in/netajik/" target="_blank">
+                <i class="fab fa-linkedin"></i> Netaji K
+            </a> 
+            | © 2025 Credit Card Fraud Detection App
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
